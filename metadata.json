@@ -1,0 +1,8 @@
+{
+  "name": "Controle de Finanças Pessoais",
+  "description": "App de finanças pessoal com controle de gastos, orçamentos automáticos por IA, sincronização bancária simulada e relatórios de fluxo de caixa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

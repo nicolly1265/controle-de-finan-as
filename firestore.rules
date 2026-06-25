@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloudfire store {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email'])
+        && data.keys().size() <= 4
+        && data.uid is string && data.uid.size() <= 128
+        && data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidBankAccount(data) {
+      return data.keys().hasAll(['id', 'bankName', 'balance', 'status'])
+        && data.keys().size() <= 8
+        && data.id is string && data.id.size() <= 128
+        && data.bankName is string && data.bankName.size() <= 100
+        && data.balance is number
+        && data.status is string && data.status.size() <= 50;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'description', 'amount', 'type', 'category', 'date'])
+        && data.keys().size() <= 10
+        && data.id is string && data.id.size() <= 128
+        && data.description is string && data.description.size() <= 200
+        && data.amount is number && data.amount > 0
+        && (data.type == 'income' || data.type == 'expense')
+        && data.category is string && data.category.size() <= 100
+        && data.date is string && data.date.size() <= 50;
+    }
+
+    function isValidBudget(data) {
+      return data.keys().hasAll(['id', 'category', 'limit', 'month'])
+        && data.keys().size() <= 8
+        && data.id is string && data.id.size() <= 128
+        && data.category is string && data.category.size() <= 100
+        && data.limit is number && data.limit >= 0
+        && data.month is string && data.month.size() <= 7;
+    }
+
+    // Matches for Collections
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming());
+      allow delete: if false;
+
+      match /bankAccounts/{bankAccountId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(bankAccountId) && isValidBankAccount(incoming());
+        allow update: if isOwner(userId) && isValidId(bankAccountId) && isValidBankAccount(incoming());
+        allow delete: if isOwner(userId) && isValidId(bankAccountId);
+      }
+
+      match /transactions/{transactionId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(transactionId) && isValidTransaction(incoming());
+        allow update: if isOwner(userId) && isValidId(transactionId) && isValidTransaction(incoming());
+        allow delete: if isOwner(userId) && isValidId(transactionId);
+      }
+
+      match /budgets/{budgetId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(budgetId) && isValidBudget(incoming());
+        allow update: if isOwner(userId) && isValidId(budgetId) && isValidBudget(incoming());
+        allow delete: if isOwner(userId) && isValidId(budgetId);
+      }
+    }
+  }
+}
